@@ -77,7 +77,7 @@ class RBing
   
   include HTTParty
   
-  attr_accessor :instance_options
+  attr_accessor :instance_options, :cache_paths
   
   base_uri "http://api.search.live.net/json.aspx"
   format :json
@@ -101,28 +101,77 @@ class RBing
   #   bing = RBing.new(YOUR_APP_ID)
   #   bing.web("ruby gems", :count => 10)
   #
-  SOURCES.each do |source|
-    fn = source.to_s.gsub(/[a-z][A-Z]/) {|c| "#{c[0,1]}_#{c[1,1]}" }.downcase
-    class_eval "def #{fn}(query, options={}) ; search('#{source}', query, options) ; end"
-  end
+  # SOURCES.each do |source|
+  #   fn = source.to_s.gsub(/[a-z][A-Z]/) {|c| "#{c[0,1]}_#{c[1,1]}" }.downcase
+  #   class_eval %(def #{fn}(query, options={}); search('#{source}', query, options) ; end)
+  # end
   
+  def web(query, options = {})
+    search('Web', query, options)
+  end
   
   # issues a search for +query+ in +source+
   #
   def search(source, query, options={})
-    rsp = self.class.get('', options_for(source, query, options))
+    # reset_cache = options.delete(:reset_cache)
+    opts = options_for(source, query, options)
+    # fname = "bing_#{to_file_name(opts.to_s)}.yml"
+    # full_fname = File.join(@cache_paths[::Rails.env] || "", fname)
+    # if @cache_paths[::Rails.env] && !(reset_cache == true)
+    #   if File.exists?(full_fname)
+    #     res = self.load_yaml(full_fname)
+    #     return ResponseData.new(res) 
+    #   end
+    # end
+    res = run_search(opts)
+    # if @cache_paths[::Rails.env]
+    #   self.save_yaml(full_fname, res)
+    # end
+    return res
+  end
+  
+  def run_search(opts)
+    rsp = self.class.get('', opts)
     ResponseData.new(rsp['SearchResponse']) if rsp
   end
   
+  def self.save_yaml(fname, data)
+    d = fname.gsub(File.basename(fname),'')
+    Dir.mkdir(d) unless Dir.exists?(d)
+    File.open(fname,'w') do |out|
+      YAML.dump(data,out)
+    end
+  end
+  def save_yaml(fname, data); RBing.save_yaml(fname, data); end
   
+  def self.load_yaml(fname)
+    data = YAML::load_file(fname)
+    ResponseData.new(data)
+  end
+  def load_yaml(fname); RBing.load_yaml(fname); end
+  
+  def self.languages
+    # TODO - figure out how this works once we return this to a gem
+    @bing_languages ||= YAML::load_file("vendor/gems/rbing/data/languages.yml")
+    return @bing_languages
+  end
+  def languages; RBing.languages; end
+  
+  def self.locations
+    # TODO - figure out how this works once we return this to a gem
+    @bing_locations ||= YAML::load_file("vendor/gems/rbing/data/locations.yml")
+    return @bing_locations
+  end
+  def locations; RBing.locations; end
+    
 private
-  
   
   # instantiates a new RBing client with the given +app_id+.
   # +options+ can contain values to be passed with each query.
   #
   def initialize(app_id=nil, options={})
     @instance_options = options.merge(:AppId => (app_id || user_app_id))
+    @cache_paths = {}
   end
   # constructs a query string for the given
   # +query+ and the optional query +options+
@@ -140,7 +189,6 @@ private
     end
     "#{query} #{queries.join(' ')}".strip
   end
-  
   
   # returns +options+ with its keys converted to
   # strings and any keys in +exclude+ omitted.
@@ -189,4 +237,10 @@ private
     fn = File.join(RUBY_PLATFORM =~ /mswin32/ ? ENV['USERPROFILE'] : ENV['HOME'], ".rbing_app_id")
     File.read(fn).strip if File.exists?(fn)
   end
+  
+  def to_file_name(text)
+    text.strip.gsub(/[^-a-zA-Z0-9_]/, '_')
+  end
+  
 end
+
