@@ -163,14 +163,16 @@ class RBing
   
   def self.languages
     # TODO - figure out how this works once we return this to a gem
-    @bing_languages ||= YAML::load_file("vendor/gems/rbing/data/languages.yml")
+    filename = File.join(File.dirname(__FILE__), '../data/languages.yml')
+    @bing_languages ||= YAML::load_file(filename)
     return @bing_languages
   end
   def languages; RBing.languages; end
   
   def self.locations
     # TODO - figure out how this works once we return this to a gem
-    @bing_locations ||= YAML::load_file("vendor/gems/rbing/data/locations.yml")
+    filename = File.join(File.dirname(__FILE__), '../data/locations.yml')
+    @bing_locations ||= YAML::load_file(filename)
     return @bing_locations
   end
   def locations; RBing.locations; end
