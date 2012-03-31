@@ -107,7 +107,17 @@ class RBing
   # end
   
   def web(query, options = {})
-    search('Web', query, options)
+    file_path =  options.delete(:save_json_to_file_path)
+    results = search('Web', query, options)
+    if file_path
+      options[:offset] ||= 0
+      Dir.mkdir(file_path) unless Dir.exists?(file_path)
+      fname = "bing_#{query.gsub(/[^0-9A-Za-z]/, '_')}_#{options[:offset]}.json"
+      file = File.join(file_path, fname)
+      File.delete(file) if File.exist?(file)
+      open(file,'w') do |f|; f.puts @rsp.to_json; end    
+    end
+    return results
   end
   
   # issues a search for +query+ in +source+
@@ -131,8 +141,9 @@ class RBing
   end
   
   def run_search(opts)
-    rsp = self.class.get('', opts)
-    ResponseData.new(rsp['SearchResponse']) if rsp
+    res = self.class.get('', opts)
+    @rsp = Marshal.load( Marshal.dump(res) )
+    ResponseData.new(res['SearchResponse']) if res
   end
   
   def self.save_yaml(fname, data)
